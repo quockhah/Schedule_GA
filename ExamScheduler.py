@@ -13,7 +13,7 @@ class ExamScheduler:
         self.root = root
         self.root.title("Chương trình xếp lịch coi thi cho Giảng Viên Khoa CNTT")
         self.root.geometry("1200x750")
-
+        
         self.lecturers = []
         self.rooms = []
         self.num_weeks = 1  # Default to 1 week
@@ -34,6 +34,7 @@ class ExamScheduler:
         menu_bar.add_command(label="Thoát", command=self.root.quit)
 
     def create_input_frame(self):
+        
         frame_input = tk.Frame(self.root, relief=tk.GROOVE, bd=2)
         frame_input.pack(pady=10, fill=tk.X)
         # Container for Room and Week Management
@@ -56,38 +57,40 @@ class ExamScheduler:
 
         self.entry_lecturer = tk.Entry(frame_lecturers, font=("Arial", 10))
         self.entry_lecturer.pack(fill=tk.X, padx=5, pady=5)
-    # Room Management
+                # Room and Week Management
         frame_rooms = tk.LabelFrame(frame_input, text="Quản lý Phòng thi", font=("Arial", 10))
         frame_rooms.pack(side=tk.LEFT, padx=10, pady=5)
         tk.Label(frame_rooms, text="Số lượng phòng thi:").pack(pady=5)
         self.spinbox_rooms = tk.Spinbox(frame_rooms, from_=1, to=100, width=5, font=("Arial", 12))
         self.spinbox_rooms.pack(pady=5)
 
-        # Week Management
         frame_weeks = tk.LabelFrame(frame_input, text="Quản lý Số Tuần Thi", font=("Arial", 10))
         frame_weeks.pack(side=tk.LEFT, padx=10, pady=5)
         tk.Label(frame_weeks, text="Số tuần thi:").pack(pady=5)
         self.spinbox_weeks = tk.Spinbox(frame_weeks, from_=1, to=10, width=5, font=("Arial", 12))
         self.spinbox_weeks.pack(pady=5)
 
-        # Start Date
+        # Ngày bắt đầu
+        current_date1 = datetime.datetime.now().strftime("%d/%m/%Y")        
         frame_start_date = tk.LabelFrame(frame_input, text="Ngày bắt đầu", font=("Arial", 10))
         frame_start_date.pack(side=tk.LEFT, padx=10, pady=5)
         self.entry_start_date = tk.Entry(frame_start_date, font=("Arial", 10))
+        self.entry_start_date.insert(0, current_date1)
         self.entry_start_date.pack(fill=tk.X, padx=5, pady=5)
-        # Buttons
+
         self.btn_confirm = tk.Button(frame_input, text="Xếp Lịch", command=self.confirm_info)
         self.btn_confirm.pack(pady=10)
         
+        # Thêm nút "Xem Lịch Đã Lưu"
         self.btn_view_saved_schedule = tk.Button(frame_input, text="Xem Lịch Đã Lưu", command=self.view_saved_schedule)
         self.btn_view_saved_schedule.pack(pady=10)
 
-
     def confirm_info(self):
+
         num_rooms = int(self.spinbox_rooms.get())
         self.num_weeks = int(self.spinbox_weeks.get())
         self.rooms = [f"Phòng {i + 1}" for i in range(num_rooms)]
-
+        
         start_date_str = self.entry_start_date.get().strip()
         try:
             start_date = datetime.datetime.strptime(start_date_str, "%d/%m/%Y")
@@ -104,18 +107,18 @@ class ExamScheduler:
         if not self.lecturers or not self.rooms:
             messagebox.showerror("Lỗi", "Vui lòng nhập đủ danh sách giảng viên và phòng thi!")
             return
-
-        # Tạo danh sách ngày nhưng loại bỏ Chủ Nhật
-        self.schedule_dates = []
-        for i in range(self.num_weeks * 7):
-            current_date = start_date + datetime.timedelta(days=i)
-            if current_date.weekday() != 6:  # 6 là Chủ Nhật
-                self.schedule_dates.append(current_date)
-
+    
         global NUM_PROCTORS, NUM_ROOMS, DAYS
         NUM_PROCTORS = len(self.lecturers)
         NUM_ROOMS = len(self.rooms)
-        DAYS = len(self.schedule_dates)
+        DAYS = self.num_weeks*7
+
+        # Tạo danh sách ngày
+       # Chỉ lấy các ngày không phải Chủ Nhật
+        self.schedule_dates = [
+            current_date for current_date in [start_date + datetime.timedelta(days=i) for i in range(DAYS)] 
+            if current_date.weekday() != 6  # 6 là Chủ Nhật
+        ]
         genetic_algo = GeneticAlgorithm.GeneticAlgorithm(
             num_proctors=NUM_PROCTORS,
             num_rooms=NUM_ROOMS,
@@ -124,12 +127,11 @@ class ExamScheduler:
             num_slots_per_day=2,  # Giả sử có 2 ca mỗi ngày
             population_size=50,  # Kích thước quần thể
             generations=100,  # Số thế hệ
-            mutation_rate=0.1,  # Tỉ lệ đột biến
-            proctors_per_room= 3   # Truyền tham số proctors_per_room
+            mutation_rate=0.1  # Tỉ lệ đột biến
+            
         )
         best_schedule = genetic_algo.genetic_algorithm()  # Gọi hàm genetic_algorithm
         self.schedule = best_schedule  # Lưu lịch vào thuộc tính self.schedule
-
         # Xóa lịch cũ (nếu có)
         if self.current_schedule_viewer is not None:
             self.current_schedule_viewer.day_frame.destroy()
@@ -184,125 +186,127 @@ class ExamScheduler:
 
         try:
             with open(file_path, "r", encoding="utf-8") as file:
-                saved_schedule = file.read().splitlines()  # Chia nội dung thành các dòng
+                content = file.read()
 
-            # Bỏ qua các dòng chứa thông tin ngày (giả sử dòng chứa "Ngày" là dòng ngày)
-            saved_schedule = [line for line in saved_schedule if "Ngày" not in line]
-
-            # Tìm và lưu thông tin ngày bắt đầu và ngày kết thúc
-            start_end_dates = [line for line in saved_schedule if "Lịch thi từ ngày" in line]
-            
-            # Lấy thông tin ngày bắt đầu và kết thúc chỉ một lần
-            if start_end_dates:
-                date_info = start_end_dates[0].replace("Lịch thi từ ngày", "").strip()
-                start_date_str, end_date_str = date_info.split("đến")
-                start_date_str = start_date_str.strip()
-                end_date_str = end_date_str.strip()
-
-                # Xóa dòng chứa thông tin ngày bắt đầu và kết thúc sau khi đã lấy được thông tin
-                saved_schedule = [line for line in saved_schedule if "Lịch thi từ ngày" not in line]
-            else:
-                start_date_str = "Không có thông tin ngày bắt đầu"
-                end_date_str = "Không có thông tin ngày kết thúc"
-
-            # Chuyển start_date_str thành đối tượng datetime
+            # Phân tích thông tin ngày từ dòng đầu tiên
+            lines = content.split('\n')
+            date_line = lines[0].strip()
+            dates = date_line.replace("Lịch thi từ ngày", "").strip().split("đến")
+            start_date_str = dates[0].strip()
+            end_date_str = dates[1].strip()
             start_date = datetime.datetime.strptime(start_date_str, "%d/%m/%Y")
 
-            # Mở cửa sổ mới để hiển thị lịch
+            # Tạo cấu trúc dữ liệu cho lịch
+            schedule_data = []
+            current_day = None
+            current_session = None
+            all_rooms = set()  # Để theo dõi tất cả các phòng
+
+            for line in lines[1:]:
+                line = line.strip()
+                if not line:
+                    continue
+
+                if line.startswith("Ngày"):
+                    current_day = {
+                        'date': line,
+                        'sessions': {'Sáng': {}, 'Chiều': {}}
+                    }
+                    schedule_data.append(current_day)
+                elif line.startswith("Sáng:"):
+                    current_session = 'Sáng'
+                elif line.startswith("Chiều:"):
+                    current_session = 'Chiều'
+                elif line.startswith("Phòng"):
+                    try:
+                        room_info = line.split(":", 1)
+                        room_number = room_info[0].strip()
+                        all_rooms.add(room_number)  # Thêm phòng vào tập hợp các phòng
+                        teachers = [t.strip() for t in room_info[1].strip().split(",")]
+                        if current_day and current_session:
+                            current_day['sessions'][current_session][room_number] = teachers
+                    except Exception as e:
+                        print(f"Lỗi khi xử lý dòng: {line}")
+                        continue
+
+            # Tạo cửa sổ hiển thị
             saved_schedule_window = tk.Toplevel(self.root)
             saved_schedule_window.title("Lịch Đã Lưu")
-            saved_schedule_window.geometry("800x600")
+            saved_schedule_window.geometry("1200x800")  # Tăng kích thước cửa sổ
 
-            # Tiêu đề cửa sổ
+            # Tiêu đề
             tk.Label(saved_schedule_window, text="Lịch thi đã lưu", font=("Arial", 16, "bold")).pack(pady=10)
+            tk.Label(saved_schedule_window, text=f"Từ ngày {start_date_str} đến ngày {end_date_str}", 
+                    font=("Arial", 14)).pack(pady=5)
 
-            # Hiển thị ngày bắt đầu và kết thúc
-            date_label = tk.Label(saved_schedule_window, text=f"Ngày: {start_date_str} đến {end_date_str}", 
-                                font=("Arial", 14), anchor="center")
-            date_label.pack(pady=10)
+            # Frame chính để hiển thị lịch
+            main_frame = tk.Frame(saved_schedule_window)
+            main_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-            # Tạo bảng hiển thị lịch
-            table_frame = tk.Frame(saved_schedule_window)
-            table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+            # Tạo canvas và scrollbar
+            canvas = tk.Canvas(main_frame)
+            scrollbar_y = tk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+            scrollbar_x = tk.Scrollbar(main_frame, orient="horizontal", command=canvas.xview)
+            scrollable_frame = tk.Frame(canvas)
 
-            # Tiêu đề cột (Phòng thi)
-            tk.Label(table_frame, text="Ca/Phòng", font=("Arial", 12, "bold"), anchor="center", width=12).grid(row=0, column=0, padx=5, pady=5)
-            for room in range(10):
-                tk.Label(table_frame, text=f"Phòng {room + 1}", font=("Arial", 12, "bold"), anchor="center", width=12).grid(row=0, column=room + 1, padx=5, pady=5)
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
 
-            # Nội dung bảng (Các ca thi)
-            time_slots = ["Sáng", "Trưa", "Chiều"]  # Các ca thay thế
-            row_index = 1
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
 
-            def display_day_schedule(day_index):
-                nonlocal row_index
-                # Xóa tất cả các label cũ trong bảng
-                for widget in table_frame.winfo_children():
-                    widget.grid_forget()
+            # Hiển thị lịch
+            for day_data in schedule_data:
+                # Frame cho mỗi ngày
+                day_frame = tk.Frame(scrollable_frame, relief="ridge", bd=2)
+                day_frame.pack(fill="x", pady=5, padx=5)
+                
+                # Tiêu đề ngày
+                tk.Label(day_frame, text=day_data['date'], font=("Arial", 12, "bold")).pack(pady=5)
+                
+                # Frame cho bảng phòng
+                table_frame = tk.Frame(day_frame)
+                table_frame.pack(fill="x", padx=10, pady=5)
+                
+                # Hiển thị các ca
+                for session_name in ['Sáng', 'Chiều']:
+                    # Header cho mỗi ca
+                    session_header = tk.Frame(table_frame, relief="solid", bd=1)
+                    session_header.pack(fill="x", pady=5)
+                    tk.Label(session_header, text=f"{session_name}", font=("Arial", 11, "bold"), width=15).pack(side="left")
+                    
+                    # Frame cho grid phòng
+                    rooms_grid = tk.Frame(session_header)
+                    rooms_grid.pack(fill="x", expand=True)
+                    
+                    # Sắp xếp các phòng theo thứ tự
+                    sorted_rooms = sorted(all_rooms, key=lambda x: int(x.split()[1]))
+                    
+                    # Header cho các phòng
+                    for i, room in enumerate(sorted_rooms):
+                        tk.Label(rooms_grid, text=room, font=("Arial", 10, "bold"), 
+                                width=25, relief="solid", bd=1).grid(row=0, column=i, padx=1)
+                    
+                    # Nội dung các phòng
+                    rooms_data = day_data['sessions'][session_name]
+                    for i, room in enumerate(sorted_rooms):
+                        teachers = rooms_data.get(room, [])
+                        teacher_text = "\n".join(teachers) if teachers else ""
+                        tk.Label(rooms_grid, text=teacher_text, font=("Arial", 10),
+                                width=25, height=2, relief="solid", bd=1,
+                                wraplength=150).grid(row=1, column=i, padx=1, pady=1)
 
-                # Tính toán ngày cho day_index
-                current_day = start_date + datetime.timedelta(days=day_index)
-                current_day_str = current_day.strftime("%d/%m/%Y")  # Chuyển ngày sang định dạng chuỗi
-
-                # Hiển thị ngày tháng cho ngày hiện tại
-                tk.Label(table_frame, text=f"Ngày {current_day_str}", font=("Arial", 14, "bold"), anchor="center", width=12).grid(row=0, columnspan=11, padx=5, pady=5)
-
-                # Hiển thị lại tiêu đề cột (Phòng thi)
-                tk.Label(table_frame, text="Ca/Phòng", font=("Arial", 12, "bold"), anchor="center", width=12).grid(row=1, column=0, padx=5, pady=5)
-                for room in range(10):
-                    tk.Label(table_frame, text=f"Phòng {room + 1}", font=("Arial", 12, "bold"), anchor="center", width=12).grid(row=1, column=room + 1, padx=5, pady=5)
-
-                row_index = 2
-                # Duyệt qua lịch đã lưu và hiển thị theo từng ca, từng phòng cho ngày hiện tại
-                for slot_index, slot in enumerate(saved_schedule[day_index * 3:(day_index + 1) * 3]):
-                    # Tạo label cho từng ca
-                    tk.Label(table_frame, text=f"{time_slots[slot_index % len(time_slots)]}", font=("Arial", 12), anchor="center", width=12).grid(row=row_index, column=0, padx=5, pady=5)
-
-                    # Hiển thị tên giảng viên theo từng phòng
-                    lecturers = slot.split(',')  # Giả sử danh sách giảng viên trong mỗi ca cách nhau bằng dấu ","
-                    for room_index, lecturer_name in enumerate(lecturers):
-                        lecturer_label = tk.Label(
-                            table_frame,
-                            text=lecturer_name.strip(),  # Xóa khoảng trắng thừa
-                            font=("Arial", 10),
-                            anchor="center",
-                            width=12,
-                            height=2,
-                            wraplength=100
-                        )
-                        lecturer_label.grid(row=row_index, column=room_index + 1, padx=5, pady=5)
-
-                    row_index += 1
-
-            # Display the first day by default
-            display_day_schedule(0)
-
-            # Add buttons for previous and next day
-            def prev_day():
-                nonlocal current_day_index
-                if current_day_index > 0:
-                    current_day_index -= 1
-                    display_day_schedule(current_day_index)
-
-            def next_day():
-                nonlocal current_day_index
-                if current_day_index < len(saved_schedule) // 3 - 1:
-                    current_day_index += 1
-                    display_day_schedule(current_day_index)
-
-            current_day_index = 0
-
-            prev_button = tk.Button(saved_schedule_window, text="Prev Day", command=prev_day)
-            prev_button.pack(side="left", padx=10, pady=10)
-
-            next_button = tk.Button(saved_schedule_window, text="Next Day", command=next_day)
-            next_button.pack(side="right", padx=10, pady=10)
+            # Pack canvas và scrollbar
+            scrollbar_y.pack(side="right", fill="y")
+            scrollbar_x.pack(side="bottom", fill="x")
+            canvas.pack(side="left", fill="both", expand=True)
 
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể mở lịch đã lưu: {e}")
+            messagebox.showerror("Lỗi", f"Không thể mở lịch đã lưu: {str(e)}")
+            print(f"Chi tiết lỗi: {str(e)}")  # In chi tiết lỗi để debug
 
-   
-    
     def export_to_excel(self, file_name="Exam_Schedule.xlsx"):
         # Tạo một workbook mới và sheet
         wb = Workbook()
@@ -334,7 +338,7 @@ class ExamScheduler:
         ws["B2"].font = header_font
 
         # Các cột tiêu đề cho các ngày trong tuần
-        columns = ["Sáng", "Chiều"]
+        columns = ["Sáng", "Chiều", "Tối"]
 
         # Tính số cột tối đa dựa trên số ngày
         max_excel_columns = len(self.schedule_dates) * 3

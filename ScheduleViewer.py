@@ -30,6 +30,7 @@ class ScheduleViewer:
         self.display_day()
 
     def display_day(self):
+        
         for widget in self.day_frame.winfo_children():
             widget.destroy()
 
@@ -80,26 +81,33 @@ class ScheduleViewer:
         if not file_path:
             return
 
+        if not self.schedule:
+            messagebox.showerror("Lỗi", "Lịch thi trống. Không có dữ liệu để lưu.")
+            return
+
         try:
             with open(file_path, "w", encoding="utf-8") as file:
                 start_date_str = self.schedule_dates[0].strftime("%d/%m/%Y")
                 end_date_str = self.schedule_dates[-1].strftime("%d/%m/%Y")
-                file.write(f"Lịch thi từ ngày {start_date_str} đến ngày {end_date_str}:\n")
+                file.write(f"Lịch thi từ ngày {start_date_str} đến ngày {end_date_str}:\n\n")
 
                 for day_index, day in enumerate(self.schedule):
                     date_str = self.schedule_dates[day_index].strftime("%d/%m/%Y")
                     file.write(f"Ngày {day_index + 1} ({date_str}):\n")
                     
                     for slot_index, slot in enumerate(day):
-                        for room_index, proctor in enumerate(slot):
-                            lecturer_name = self.lecturers[proctor]
-                            file.write(f"{lecturer_name},{room_index + 1}, ")
-                        file.write("\n")
-                
-                messagebox.showinfo("Thông báo", "Lịch thi đã được lưu thành công!")
+                        time_slot = ["Sáng", "Chiều"][slot_index]
+                        file.write(f"  {time_slot}:\n")
+                        for room_index, proctor_list in enumerate(slot):
+                            lecturer_names = ", ".join([self.lecturers[proctor] for proctor in proctor_list])
+                            file.write(f"    Phòng {room_index + 1}: {lecturer_names}\n")
+                    file.write("\n")
+
+            messagebox.showinfo("Thông báo", "Lịch thi đã được lưu thành công!")
         
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể lưu lịch: {e}")
+
 
     def prev_day(self):
         if self.current_day > 0:
