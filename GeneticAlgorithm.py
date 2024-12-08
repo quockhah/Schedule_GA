@@ -59,7 +59,7 @@ class GeneticAlgorithm:
         for day in range(self.num_days):
             current_date = start_date + timedelta(days=day)
             
-            if current_date.weekday() == 6:  # Chủ Nhật
+            if current_date.weekday() == 7:  # Chủ Nhật
                 # Tạo ngày hoàn toàn không có phân công
                 day_schedule = [[] for _ in range(self.num_slots_per_day)]
             else:
@@ -78,17 +78,13 @@ class GeneticAlgorithm:
                         if not all_available_proctors:
                             all_available_proctors = list(range(self.num_proctors))
                         
-                        # Chọn giảng viên cho mỗi phòng thi
-                        room_proctors = []
-                        for _ in range(self.proctors_per_room):
-                            if not all_available_proctors:
-                                all_available_proctors = list(range(self.num_proctors))
-                            
-                            selected_proctor = random.choice(all_available_proctors)
-                            room_proctors.append(selected_proctor)
-                            all_available_proctors.remove(selected_proctor)
-                        
-                        slot_proctors.append(room_proctors)
+                        # Chọn 3 giảng viên cho mỗi phòng thi
+                    selected_proctors = random.sample(all_available_proctors, 2)
+                    slot_proctors.append(selected_proctors)
+                    
+                    # Xóa các giảng viên đã chọn khỏi danh sách có sẵn
+                    for proctor in selected_proctors:
+                        all_available_proctors.remove(proctor)
                     
                     day_schedule.append(slot_proctors)
             
